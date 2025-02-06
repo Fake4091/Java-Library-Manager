@@ -12,7 +12,7 @@ public class Main {
     /*
      * try {
      * Connection connection =
-     * DriverManager.getConnection("jdbc:postgresql:library");
+     * DriverManager.getConnection("jdbc:postgresql:test");
      * PreparedStatement stmt = connection.prepareStatement("");
      * } catch (SQLException ex) {
      * ex.printStackTrace();
@@ -25,13 +25,17 @@ public class Main {
 
     while (!option.equalsIgnoreCase("q")) {
       System.out
-          .println("Would you like to [register] for a library card, [borrow] a book, [return] a book?, or [q]uit?");
+          .println(
+              "Would you like to [register] for a library card, [view] available books,\n[borrow] a book, [return] a book, or [q]uit?");
       System.out.print("> ");
       option = in.nextLine();
 
       switch (option.toLowerCase()) {
         case "register":
           register();
+          break;
+        case "view":
+          viewBooks();
           break;
         case "borrow":
           borrowBook();
@@ -60,6 +64,47 @@ public class Main {
     Person person = new Person(fname, lname);
     person.save();
     System.out.println("Thanks for registering! Your ID is " + person.id);
+  }
+
+  public static void viewBooks() {
+    ArrayList<Book> books = Book.getBooks(10);
+    int maxOffset = Book.countBooks() - 10;
+    String viewOption = "";
+
+    printBooks((ArrayList<Book>) books);
+
+    System.out.println("Enter [n] to retrieve the next 10 books or [q] to go back to the main menu");
+    System.out.print("> ");
+    viewOption = in.nextLine();
+
+    int offset = 10;
+    while (viewOption.equalsIgnoreCase("n") && offset <= maxOffset) {
+      books = Book.getBooks(10, offset);
+      printBooks((ArrayList<Book>) books);
+      offset += 10;
+
+      System.out.println("Enter [n] to retrieve the next 10 books or [q] to go back to the main menu");
+      System.out.print("> ");
+      viewOption = in.nextLine();
+    }
+
+    if (offset > maxOffset) {
+      books = Book.getBooks(10, maxOffset);
+
+      printBooks((ArrayList<Book>) books);
+
+      System.out.println("No more books to view");
+    }
+    System.out.println("Returning to main menu");
+  }
+
+  private static void printBooks(ArrayList<Book> books) {
+      for (Book book : books) {
+          System.out.println("ID: " + book.id);
+          System.out.println("Title: " + book.title);
+          System.out.println("Author: " + book.author);
+          System.out.println("-".repeat(40));
+      }
   }
 
   public static void borrowBook() {
@@ -113,13 +158,11 @@ public class Main {
   }
 
   public static void returnBook() {
-    Scanner return_in = new Scanner(System.in);
-
     String id_str = "-1";
     int id_int = -1;
     boolean success = false;
 
-    id_int = getId(id_int, success, return_in);
+    id_int = getId(id_int, success, in);
 
     Person person = Person.find(id_int);
     ArrayList<Book> borrowedBooks = person.borrowedBooks();
@@ -130,12 +173,12 @@ public class Main {
         System.out.println("ID: " + borrowedBook.id);
         System.out.println("Title: " + borrowedBook.title);
         System.out.println(" Author: " + borrowedBook.author);
-        System.out.println("*".repeat(40));
+        System.out.println("-".repeat(40));
       }
 
       System.out.println("Which book would you like to return (type the ID)?");
       System.out.print("> ");
-      String returnID = return_in.nextLine();
+      String returnID = in.nextLine();
       int returnID_int = -1;
 
       boolean converted = false;
@@ -145,6 +188,9 @@ public class Main {
           converted = true;
         } catch (Exception e) {
           System.out.println("That is not a valid ID. Please try again.");
+          System.out.println("Which book would you like to return (type the ID)?");
+          System.out.print("> ");
+          returnID = in.nextLine();
         }
       }
 
@@ -158,12 +204,14 @@ public class Main {
 
       if (!returnSuccess) {
         System.out.println("You didn't borrow that book. Please try again.");
+      } else {
+        System.out.println("The book was successfully returned.");
+      }
       }
 
     } else {
       System.out.println("You have not borrowed any books.");
     }
-    return_in.close();
   }
 }
 
@@ -185,7 +233,7 @@ class Person {
 
   public void save() {
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection
           .prepareStatement("INSERT INTO people (first_name, last_name) VALUES (?, ?)",
               Statement.RETURN_GENERATED_KEYS);
@@ -213,7 +261,7 @@ class Person {
 
   public void delete() {
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("DELETE FROM people WHERE id = ?");
 
       if (id != 0) {
@@ -236,7 +284,7 @@ class Person {
     Person person = null;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("SELECT * FROM people WHERE id = ?");
 
       stmt.setInt(1, id_num);
@@ -262,7 +310,7 @@ class Person {
     ArrayList<Book> books = new ArrayList<Book>();
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("SELECT * FROM books WHERE borrower = ?");
 
       stmt.setInt(1, id);
@@ -292,7 +340,7 @@ class Book {
     this.author = author;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection
           .prepareStatement("SELECT id, borrower FROM books WHERE title = ? AND author = ?");
 
@@ -321,7 +369,7 @@ class Book {
     this.id = id;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("SELECT borrower FROM books WHERE id = ?");
 
       stmt.setInt(1, id);
@@ -337,9 +385,82 @@ class Book {
     }
   }
 
+  public static int countBooks() {
+    int count = 0;
+    try {
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
+      PreparedStatement stmt = connection.prepareStatement("SELECT COUNT(*) FROM books");
+
+      ResultSet rs = stmt.executeQuery();
+
+      if (rs.next()) {
+        count = rs.getInt(1);
+      }
+    } catch (SQLException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+
+    return count;
+  }
+
+  public static ArrayList<Book> getBooks(int num_books) {
+    ArrayList<Book> books = new ArrayList<Book>();
+
+    if (num_books <= 0) {
+      throw new IllegalArgumentException();
+    }
+
+    try {
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
+      PreparedStatement stmt = connection.prepareStatement("SELECT * FROM books WHERE borrower IS NULL LIMIT ?");
+
+      stmt.setInt(1, num_books);
+
+      ResultSet rs = stmt.executeQuery();
+
+      while (rs.next()) {
+        books.add(new Book(rs.getString("title"), rs.getString("author"), rs.getInt("id")));
+      }
+    } catch (SQLException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+
+    return books;
+  }
+
+  public static ArrayList<Book> getBooks(int num_books, int offset) {
+    ArrayList<Book> books = new ArrayList<Book>();
+
+    if (num_books <= 0) {
+      throw new IllegalArgumentException();
+    }
+
+    try {
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
+      PreparedStatement stmt = connection
+          .prepareStatement("SELECT * FROM books WHERE borrower IS NULL LIMIT ? OFFSET ?");
+
+      stmt.setInt(1, num_books);
+      stmt.setInt(2, offset);
+
+      ResultSet rs = stmt.executeQuery();
+
+      while (rs.next()) {
+        books.add(new Book(rs.getString("title"), rs.getString("author"), rs.getInt("id")));
+      }
+    } catch (SQLException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+
+    return books;
+  }
+
   public void save() {
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement test_stmt = connection
           .prepareStatement("SELECT COUNT(*) FROM books WHERE title = ? AND author = ?");
 
@@ -386,7 +507,7 @@ class Book {
 
   public void delete() {
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("DELETE FROM people WHERE id = ?");
 
       if (id != 0) {
@@ -410,7 +531,7 @@ class Book {
     Book book = null;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("SELECT * FROM books WHERE id = ?");
 
       stmt.setInt(1, id_num);
@@ -436,7 +557,7 @@ class Book {
     ArrayList<Book> books = new ArrayList<Book>();
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("SELECT * FROM books WHERE title = ?");
 
       stmt.setString(1, title);
@@ -462,7 +583,7 @@ class Book {
     borrower = person_id;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("UPDATE books SET borrower = ? WHERE id = ?");
 
       stmt.setInt(1, borrower);
@@ -483,7 +604,7 @@ class Book {
     borrower = -1;
 
     try {
-      Connection connection = DriverManager.getConnection("jdbc:postgresql:library");
+      Connection connection = DriverManager.getConnection("jdbc:postgresql:test");
       PreparedStatement stmt = connection.prepareStatement("UPDATE books SET borrower = ? WHERE id = ?");
 
       stmt.setNull(1, 4);
